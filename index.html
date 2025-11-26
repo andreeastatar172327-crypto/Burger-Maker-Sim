@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Burger Making Sim</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <!-- PWA / App-Like Settings -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1f2937">
+    
+    <!-- Explicit Apple Touch Icon for iOS -->
+    <link rel="apple-touch-icon" href="https://placehold.co/192x192/4ade80/9f1239?text=🍔"> 
+
+    <!-- Dynamic Manifest Injection for PWA installation -->
+    <script>
+        // This script dynamically creates the manifest file required for PWA installation
+        document.addEventListener('DOMContentLoaded', () => {
+            const manifestData = {
+                // The name that appears on the home screen
+                name: "Burger Sim Game", 
+                short_name: "BurgerSim",
+                description: "The ultimate burger making recipe challenge game.",
+                start_url: "./index.html", // Points to itself (relative to the hosted URL)
+                display: "standalone", // CRITICAL: Forces full-screen app mode
+                background_color: "#1f2937",
+                theme_color: "#f59e0b",
+                icons: [
+                    {
+                        // Custom icon with a burger emoji
+                        src: "https://placehold.co/192x192/4ade80/9f1239?text=🍔",
+                        sizes: "192x192",
+                        type: "image/png"
+                    },
+                    {
+                        src: "https://placehold.co/512x512/4ade80/9f1239?text=🍔",
+                        sizes: "512x512",
+                        type: "image/png"
+                    }
+                ]
+            };
+
+            const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
+            const manifestUrl = URL.createObjectURL(manifestBlob);
+            
+            const link = document.createElement('link');
+            link.rel = 'manifest';
+            link.href = manifestUrl;
+            document.head.appendChild(link);
+            
+            // Check if the app is running in PWA mode after installation
+            if (window.matchMedia('(display-mode: standalone)').matches || document.referrer.includes('android-app://')) {
+                document.querySelector('header p').textContent = "Welcome to your installed Burger Sim app!";
+            }
+        });
+    </script>
+
+    <style>
+        :root {
+            --color-primary: #f59e0b;
+            --color-secondary: #ef4444;
+            --color-success: #10b981;
+            --color-coin: #f59e0b;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1f2937; /* Dark hosting background */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-bottom: 3rem; 
+            touch-action: manipulation;
+        }
+        
+        /* Container for the game area, giving it a nice separation */
+        .game-hosting-card {
+            background-color: #f3f4f6; /* Light background for the game content */
+            padding: 1rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+            width: 100%;
+            max-width: 450px;
+        }
+
+        /* --- GAME-SPECIFIC STYLES --- */
+        .ingredient-btn {
+            transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
+            min-height: 45px;
+        }
+        .ingredient-btn:active:not(.disabled) {
+            transform: scale(0.95);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+        }
+        .patty-cooked-btn { background-color: #7c2d12; color: white; }
+        .bun-bottom { background-color: #fcd34d; }
+        .bun-top { background-color: #fcd34d; }
+        .cheese { background-color: #fde047; color: #333;}
+        .tomato { background-color: #ef4444; color: white; }
+        .lettuce { background-color: #6ee7b7; color: #333;}
+        .mayo { background-color: #fef3c7; color: #854d0e; border: 1px solid #fde047;} 
+        .ketchup { background-color: #dc2626; color: white; }
+        
+        /* --- STACK DISPLAY STYLES --- */
+        .burger-part {
+            width: 100%;
+            border-radius: 5px;
+            margin-bottom: -10px; 
+            position: relative;
+            transition: all 0.5s ease-out;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            box-sizing: border-box; 
+        }
+        
+        .burger-part.bun-bottom-display {
+            height: 40px; 
+            border-radius: 0 0 5px 5px; 
+            background-color: #fcd34d;
+            z-index: 10;
+            border-top: none;
+            box-shadow: inset 0 5px 10px rgba(0,0,0,0.1);
+        }
+        
+        .burger-part.patty-cooked-display {
+            height: 40px; 
+            background-color: #7c2d12;
+            border-radius: 5px; 
+            z-index: 20;
+        }
+        
+        .burger-part.cheese-display {
+            height: 15px; 
+            background-color: #fde047;
+            z-index: 30;
+            border-radius: 2px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        .burger-part.tomato-display {
+            height: 25px; 
+            background-color: #ef4444;
+            border-radius: 5px; 
+            z-index: 40;
+        }
+        
+        .burger-part.lettuce-display {
+            height: 20px; 
+            background-color: #6ee7b7;
+            z-index: 50;
+            border-radius: 0 0 100% 100% / 0 0 5px 5px;
+            box-shadow: inset 0 -3px 5px rgba(0, 100, 0, 0.2);
+        }
+
+        .burger-part.mayonnaise-display, .burger-part.ketchup-display {
+            height: 15px; 
+            z-index: 55;
+            clip-path: polygon(
+                0% 0%, 100% 0%, 
+                100% 70%, 
+                95% 85%, 
+                80% 70%, 
+                75% 100%, 
+                60% 80%, 
+                45% 100%, 
+                30% 75%, 
+                15% 100%, 
+                0% 70%
+            );
+            border-radius: 5px 5px 0 0;
+            margin-bottom: -10px;
+        }
+
+        .burger-part.mayonnaise-display {
+            background-color: #fef3c7;
+            box-shadow: 0 1px 5px rgba(133, 77, 14, 0.5); 
+        }
+
+        .burger-part.ketchup-display {
+            background-color: #dc2626; 
+            box-shadow: 0 1px 5px rgba(100, 0, 0, 0.5); 
+        }
+        
+        .burger-part.bun-top-display {
+            height: 50px; 
+            border-radius: 50px 50px 0 0; 
+            background-color: #fcd34d;
+            z-index: 60;
+            margin-bottom: 0;
+            border-bottom: none;
+            box-shadow: 
+                0 5px 10px rgba(0,0,0,0.1), 
+                8px 8px 0 0 3px #f8f8e7,
+                -12px 4px 0 0 3px #f8f8e7,
+                0px 15px 0 0 3px #f8f8e7,
+                10px 25px 0 0 3px #f8f8e7,
+                -7px 20px 0 0 3px #f8f8e7,
+                -15px 10px 0 0 3px #f8f8e7,
+                6px 0px 0 0 3px #f8f8e7;
+        }
+
+        .disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .coin-display {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            background-color: var(--color-coin);
+            color: white;
+            border-radius: 9999px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .coin-icon {
+            font-size: 1.2em;
+            margin-right: 5px;
+        }
+        
+        .modal-high-z {
+            z-index: 100;
+        }
+        
+        .horizontal-scroll-list::-webkit-scrollbar {
+            display: none;
+        }
+        .horizontal-scroll-list {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="p-4">
+
+    <!-- Header Section (Host Site Header) -->
+    <header class="text-center mb-6 p-4 bg-yellow-400 rounded-xl max-w-lg w-full shadow-lg">
+        <h1 class="text-4xl font-black text-gray-900">🍔 Burger Making Sim 🚀</h1>
+        <p class="text-lg mt-2 text-gray-700 font-semibold">Install this game to your home screen!</p>
+    </header>
+
+    <!-- Game Content Container (Previously the whole game body) -->
+    <div class="game-hosting-card">
+
+        <div id="game-container" class="w-full">
+
+            <!-- Header and Score -->
+            <header class="text-center mb-4 p-4 bg-white rounded-xl shadow-md">
+                <h1 class="text-xl font-bold text-gray-800">Recipe Challenge Mode</h1>
+                <p id="message" class="text-md font-semibold text-purple-600 mt-2">Recipe Challenge: Complete recipes to unlock ingredients and earn coins!</p>
+                <div id="status-bar" class="mt-2 text-sm text-gray-600 flex justify-between items-center">
+                    <span id="current-task">Start with the "Plain Patty Stack" recipe to earn your first coins!</span>
+                    <div id="coin-counter" class="coin-display">
+                        <span class="coin-icon">💰</span>
+                        <span id="coins-value">0</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Assembly Area -->
+            <div id="assembly-section" class="mb-4 bg-white p-4 rounded-xl shadow-md">
+                <h2 class="text-xl font-bold mb-2 text-center text-gray-700">The Plate</h2>
+                <div id="plate-area" class="w-full h-80 flex flex-col items-center justify-center bg-gray-100 p-2 rounded-lg border-4 border-dashed border-gray-300 relative overflow-hidden">
+                    <div id="burger-stack" class="w-3/5 flex flex-col-reverse items-center">
+                        <!-- Burger parts will be appended here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ingredient and Action Buttons -->
+            <div id="ingredient-panel" class="p-4 bg-white rounded-xl shadow-md">
+                <h2 class="text-xl font-bold mb-3 text-gray-700">Ingredients</h2>
+                <div class="grid grid-cols-3 gap-2">
+                    
+                    <button id="bun-bottom" class="ingredient-btn bun-bottom p-2 rounded-xl font-bold text-xs" onclick="handleAction('bun-bottom')">
+                        Bun Bottom
+                    </button>
+                    <button id="patty-cooked" class="ingredient-btn patty-cooked-btn p-2 rounded-xl font-bold text-xs" onclick="handleAction('patty-cooked')">
+                        Cooked Patty
+                    </button>
+                    <button id="cheese" class="ingredient-btn cheese p-2 rounded-xl font-bold text-xs" onclick="handleAction('cheese')">
+                        Cheese
+                    </button>
+                    
+                    <button id="tomato" class="ingredient-btn tomato p-2 rounded-xl font-bold text-xs" onclick="handleAction('tomato')">
+                        Tomato
+                    </button>
+                    <button id="lettuce" class="ingredient-btn lettuce p-2 rounded-xl font-bold text-xs" onclick="handleAction('lettuce')">
+                        Lettuce
+                    </button>
+                    <button id="mayonnaise" class="ingredient-btn mayo p-2 rounded-xl font-bold text-xs" onclick="handleAction('mayonnaise')">
+                        Mayonnaise
+                    </button>
+                    
+                    <button id="ketchup" class="ingredient-btn ketchup p-2 rounded-xl font-bold text-xs" onclick="handleAction('ketchup')">
+                        Ketchup
+                    </button>
+                    
+                    <button id="bun-top" class="ingredient-btn bun-top p-2 rounded-xl font-bold text-xs" onclick="handleAction('bun-top')">
+                        Bun Top (Finish)
+                    </button>
+
+                </div>
+                
+                <div class="mt-4 flex space-x-3">
+                    <button id="recipe-button" class="w-1/3 p-3 bg-indigo-500 hover:bg-indigo-600 text-white font-extrabold rounded-xl transition" onclick="showRecipesModal()">
+                        Recipes
+                    </button>
+                    <button id="shop-button" class="w-1/3 p-3 bg-green-500 hover:bg-green-600 text-white font-extrabold rounded-xl transition" onclick="showShopModal()">
+                        Shop 🛒
+                    </button>
+                    <button id="reset-button" class="w-1/3 p-3 bg-red-500 hover:bg-red-600 text-white font-extrabold rounded-xl transition" onclick="resetBurgerStack()">
+                        Reset Burger
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+    </div> <!-- End of game-hosting-card -->
+    
+    <!-- Footer / Instructions (Host Site Footer) -->
+    <footer class="mt-6 text-center text-gray-400 text-sm w-full max-w-lg">
+        <p>Tip: Complete recipes to unlock ingredients in the Shop!</p>
+    </footer>
+
+    <!-- Custom Modal for Alerts/Results -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center modal-high-z">
+        <div class="bg-white p-6 rounded-2xl w-11/12 max-w-sm text-center shadow-2xl">
+            <h3 id="modal-title" class="text-2xl font-black mb-3 text-gray-800"></h3>
+            <p id="modal-message" class="mb-5 text-gray-600"></p>
+            <button class="w-full p-3 bg-emerald-500 text-white font-bold rounded-xl" onclick="closeModal()">OK / Build Another</button>
+        </div>
+    </div>
+
+    <!-- Recipes Modal -->
+    <div id="recipes-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center modal-high-z">
+        <div class="bg-white p-5 rounded-2xl w-11/12 max-w-lg shadow-2xl flex flex-col">
+            <h3 class="text-2xl font-black mb-4 text-gray-800 border-b pb-2">Burger Recipes List</h3>
+            
+            <div id="recipes-list" class="flex overflow-x-auto pb-4 space-x-4 horizontal-scroll-list"> 
+                <!-- Recipes will be inserted here by JavaScript -->
+            </div>
+            
+            <button class="mt-4 flex-shrink-0 w-full p-3 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded-xl transition" onclick="closeRecipesModal()">Close</button>
+        </div>
+    </div>
+    
+    <!-- Shop Modal -->
+    <div id="shop-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center modal-high-z">
+        <div class="bg-white p-6 rounded-2xl w-11/12 max-w-sm shadow-2xl">
+            <h3 class="text-2xl font-black mb-2 text-gray-800">The Burger Emporium</h3>
+            <p class="text-sm text-gray-500 mb-4">Current Coins: <span id="shop-coins-value" class="font-bold text-lg text-yellow-600">0</span> 💰</p>
+            <div id="shop-items-list" class="space-y-4">
+                <!-- Shop items will be inserted here -->
+            </div>
+            <button class="mt-6 w-full p-3 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded-xl transition" onclick="closeShopModal()">Close Shop</button>
+        </div>
+    </div>
+
+    <script>
+        // Max limit for any single ingredient type, including buns
+        const MAX_INGREDIENT_COUNT = 3; 
+
+        // Global Game State - All purchasable items start locked
+        const gameState = {
+            assembledIngredients: [],
+            isGameFinished: false,
+            coins: 0,
+            completedRecipes: [],
+            cheeseUnlocked: false,
+            tomatoUnlocked: false,
+            lettuceUnlocked: false,
+            mayoUnlocked: false,
+            ketchupUnlocked: false,
+        };
+
+        // Shop Items Configuration
+        const SHOP_ITEMS = {
+            cheese: {
+                name: "Cheese Slice",
+                cost: 10,
+                id: "cheese",
+                stateKey: "cheeseUnlocked"
+            },
+            veggieBundle: {
+                name: "Tomato & Lettuce Bundle",
+                cost: 20,
+                id: "veggieBundle",
+                stateKey: ["tomatoUnlocked", "lettuceUnlocked"] 
+            },
+            mayonnaise: {
+                name: "Mayonnaise Sauce",
+                cost: 10,
+                id: "mayonnaise",
+                stateKey: "mayoUnlocked"
+            },
+            ketchup: {
+                name: "Ketchup Sauce",
+                cost: 12,
+                id: "ketchup",
+                stateKey: "ketchupUnlocked"
+            }
+        };
+
+        // Burger Recipes
+        const BURGER_RECIPES = [
+            { 
+                name: "Plain Patty Stack",
+                id: "plain-patty-stack",
+                ingredients: [
+                    "bun-bottom",
+                    "patty-cooked",
+                    "bun-top"
+                ]
+            },
+            { 
+                name: "Cheesy Patty Stack",
+                id: "cheesy-patty-stack",
+                ingredients: [
+                    "bun-bottom",
+                    "patty-cooked",
+                    "cheese",
+                    "bun-top"
+                ]
+            },
+            {
+                name: "Classic Square Stack",
+                id: "classic-square",
+                ingredients: [
+                    "bun-bottom",
+                    "patty-cooked",
+                    "cheese",
+                    "tomato",
+                    "lettuce",
+                    "bun-top"
+                ]
+            },
+            {
+                name: "Double Deck Delight",
+                id: "double-deck",
+                ingredients: [
+                    "bun-bottom",
+                    "patty-cooked",
+                    "cheese",
+                    "patty-cooked",
+                    "cheese",
+                    "bun-top"
+                ]
+            },
+            {
+                name: "Veggie Tower",
+                id: "veggie-tower",
+                ingredients: [
+                    "bun-bottom",
+                    "lettuce",
+                    "tomato",
+                    "lettuce",
+                    "tomato",
+                    "bun-top"
+                ]
+            },
+            { 
+                name: "Sauce & Cheese Deluxe",
+                id: "sauce-cheese-deluxe",
+                ingredients: [
+                    "bun-bottom",
+                    "patty-cooked",
+                    "cheese",
+                    "mayonnaise",
+                    "ketchup",
+                    "bun-top"
+                ]
+            }
+        ];
+
+        // DOM Elements
+        const DOMElements = {
+            message: document.getElementById('message'),
+            currentTask: document.getElementById('current-task'),
+            burgerStack: document.getElementById('burger-stack'),
+            modal: document.getElementById('modal'),
+            modalTitle: document.getElementById('modal-title'),
+            modalMessage: document.getElementById('modal-message'),
+            coinsValue: document.getElementById('coins-value'), 
+            recipesModal: document.getElementById('recipes-modal'), 
+            recipesList: document.getElementById('recipes-list'), 
+            shopModal: document.getElementById('shop-modal'),
+            shopItemsList: document.getElementById('shop-items-list'),
+            shopCoinsValue: document.getElementById('shop-coins-value'),
+        };
+
+        const STORAGE_KEY = 'burgerMakerSimState';
+        
+        // --- Persistence Logic (Local Storage) ---
+
+        /**
+         * Saves the current gameState to localStorage.
+         */
+        fun
